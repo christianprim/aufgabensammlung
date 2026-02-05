@@ -1,2 +1,2 @@
-# aufgabensammlung
-Grundgerüst für eine Aufgabensammlung in typst
+# Aufgabensammlung
+Grundgerüst für eine Aufgabensammlung in [typst](https://typst.app)
