@@ -2,11 +2,8 @@
 #import "auswahl.typ": daten, aufgaben
 
 #let desired-page-number = 8
-#let daten = daten
 
 #show: prüfung.with(..daten)
-
-#let aufgaben = aufgaben
 
 #for aufgabe in aufgaben{
   [#aufgabe]
