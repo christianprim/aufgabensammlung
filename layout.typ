@@ -1,14 +1,13 @@
-#import "@preview/unify:0.7.1": num, qty, unit, add-unit
-#import "@preview/cetz:0.4.2" as cetz
-#import "@preview/cetz-plot:0.1.3" as cetz-plot
-#import "@preview/zap:0.5.0" as zap
-#import "@preview/itemize:0.2.0" as el
+#import "@preview/unify:0.8.1": add-unit, num, qty, unit
+#import "@preview/cetz:0.5.3" as cetz
+#import "@preview/cetz-plot:0.1.4" as cetz-plot
+#import "@preview/zap:0.6.0" as zap
+#import "@preview/itemize:0.3.0" as el
 #import "@preview/physica:0.9.8" as physica
 
 #let in-list-depth = state("in-list-depth", 0)
 
 #let prüfung(art: "Prüfung", klasse: "", datum: "", doc) = {
-
   set page(
     paper: "a4",
     margin: (x: 2cm, top: 2cm, bottom: 1.5cm),
@@ -23,10 +22,10 @@
               ]
             ]
           ]
-        ] 
+        ]
       }
     },
-    
+
     footer: context {
       let page_nr = counter(page).get().first()
       set text(font: "TeX Gyre Heros", fill: blue)
@@ -35,25 +34,25 @@
       } else {
         [_#page_nr #h(1fr) KZN_]
       }
-    }
+    },
   )
-    
+
   set text(
-    font: "TeX Gyre Pagella", 
+    font: "TeX Gyre Pagella",
     lang: "de",
-    region: "CH"
+    region: "CH",
   )
 
   set par(
-    justify: true
+    justify: true,
   )
   set heading(numbering: "1.")
   set enum(numbering: "a)")
-  
+
   show heading: it => text(font: "TeX Gyre Heros", fill: blue.darken(50%))[#emph[#it]]
   show heading.where(level: 1): it => text(size: 12pt)[#it]
   show math.equation: set text(font: "TeX Gyre Pagella Math")
-  
+
   let in-list-depth = state("in-list-depth", 0)
 
   show enum: it => {
@@ -74,16 +73,15 @@
 }
 
 #let musterlösung(art: "Prüfung", klasse: "", datum: "", doc) = {
-
   set page(
     paper: "a4",
     margin: (x: 2cm, y: 2cm),
-    header: [ 
+    header: [
       #text(font: "TeX Gyre Heros", fill: gray)[
-           _Musterlösung zur #art der Klasse #klasse vom #datum _
-        ]   
-      ],
-    
+        _Musterlösung zur #art der Klasse #klasse vom #datum _
+      ]
+    ],
+
     footer: context {
       let page_nr = counter(page).get().first()
       set text(font: "TeX Gyre Heros", fill: gray)
@@ -92,17 +90,17 @@
       } else {
         [_#page_nr #h(1fr) KZN_]
       }
-    }
+    },
   )
-    
+
   set text(
-    font: "TeX Gyre Pagella", 
+    font: "TeX Gyre Pagella",
     lang: "de",
-    region: "CH"
+    region: "CH",
   )
 
   set par(
-    justify: true
+    justify: true,
   )
 
   set heading(numbering: "1.")
@@ -124,18 +122,18 @@
 }
 
 // Schreibpapier
-#let schreibpapier(height: none, size: 4mm) = context { 
+#let schreibpapier(height: none, size: 4mm) = context {
   let grid_height = height
   if height != none {
     assert(type(height) == length, message: "Height muss eine Länge sein (z.B. 10pt)")
   } else {
     grid_height = 1fr
   }
-  
-  block(height: grid_height, layout(place => { 
+
+  block(height: grid_height, layout(place => {
     let columns = calc.floor(place.width / size)
     let rows = calc.floor(place.height / size)
-  
+
     grid(
       columns: (size,) * columns,
       rows: (size,) * rows,
@@ -149,9 +147,9 @@
   let depth = in-list-depth.get()
   let is-right-side = calc.odd(here().page())
   let gutter = if is-right-side { 1cm } else { -1cm }
-  if depth > 0 and not is-right-side { gutter -= depth * 1.5em}
+  if depth > 0 and not is-right-side { gutter -= depth * 1.5em }
   let alignment = if is-right-side { right } else { left }
-  place(alignment, dx: gutter )[
+  place(alignment, dx: gutter)[
     #set text(weight: "bold", fill: blue)
     #punktzahl P
   ]
@@ -163,7 +161,6 @@
 
 // eigene Komponenten für Zap
 #let lamp(name, node, ..params) = {
-
   let draw(ctx, position, style) = {
     zap.interface((-style.radius, -style.radius), (style.radius, style.radius), io: position.len() < 2)
     cetz.draw.circle((0, 0), radius: style.radius, ..style)
@@ -177,7 +174,11 @@
 
 #let battery(name, node, ..params) = {
   let draw(ctx, position, style) = {
-    zap.interface((-style.distance / 3, -style.width / 2), (style.distance / 3, style.width / 2), io: position.len() < 2)
+    zap.interface(
+      (-style.distance / 3, -style.width / 2),
+      (style.distance / 3, style.width / 2),
+      io: position.len() < 2,
+    )
 
     let plates() = {
       cetz.draw.line((-style.distance / 3, style.width / 4), (-style.distance / 3, -style.width / 4))
@@ -193,80 +194,73 @@
 }
 
 #let toggle-switch(name, node, ..params) = {
-    assert(params.pos().len() == 0, message: "ground supports only one node")
+  assert(params.pos().len() == 0, message: "ground supports only one node")
 
-    // Drawing function
-    let draw(ctx, position, style) = {
-        zap.interface((-style.width / 2, -0.2), (style.width / 2, 0.2), io: position.len() < 2)
+  // Drawing function
+  let draw(ctx, position, style) = {
+    zap.interface((-style.width / 2, -0.2), (style.width / 2, 0.2), io: position.len() < 2)
 
-        cetz.draw.anchor("in", (-style.width / 2, 0))
-        cetz.draw.anchor("out1", (style.angle, style.width / 2))
-        cetz.draw.anchor("out2", (-style.angle, style.width / 2))
+    cetz.draw.anchor("in", (-style.width / 2, 0))
+    cetz.draw.anchor("out1", (style.angle, style.width / 2))
+    cetz.draw.anchor("out2", (-style.angle, style.width / 2))
 
- 
-        cetz.draw.line("in", "out1", stroke: style.stroke)
-    }
+    cetz.draw.line("in", "out1", stroke: style.stroke)
+  }
 
-    // Component call
-    zap.component("toggle-switch", name, node, draw: draw, ..params, label: none)
+  // Component call
+  zap.component("toggle-switch", name, node, draw: draw, ..params, label: none)
 }
 
 #let init-zap = cetz.draw.set-ctx(ctx => {
-  ctx.zap.style.insert("lamp",
-    (
-        scale: auto,
-        stroke: auto,
-        radius: .47cm,
-    )
-  )
-  ctx.zap.style.insert("battery",
-    (
-        scale: auto,
-        stroke: auto,
-        radius: .47cm,
-    )
-  )
-  ctx.zap.style.insert("toggle-switch",
-    (
-        scale: auto,
-        stroke: auto,
-        width: .8,
-        angle: 35deg,
-    )
-  )
+  ctx.zap.style.insert("lamp", (
+    scale: auto,
+    stroke: auto,
+    radius: .47cm,
+  ))
+  ctx.zap.style.insert("battery", (
+    scale: auto,
+    stroke: auto,
+    radius: .47cm,
+  ))
+  ctx.zap.style.insert("toggle-switch", (
+    scale: auto,
+    stroke: auto,
+    width: .8,
+    angle: 35deg,
+  ))
   ctx
 })
 
 #let zap-style = (
-  scale: (x: 1, y: 1), 
-  stroke: 0.5pt, 
+  scale: (x: 1, y: 1),
+  stroke: 0.5pt,
   decoration: (
-    symbol: none, 
+    symbol: none,
     current: (
-      symbol: "barbed", 
-      stroke: red
-    ), 
+      symbol: "barbed",
+      stroke: red,
+    ),
     voltage: (
-      stroke: blue, 
-      start: (-.3, .0), 
-      end: (.3, .0), 
-      center: (0, .2)
-    )
+      stroke: blue,
+      start: (-.3, .0),
+      end: (.3, .0),
+      center: (0, .2),
+    ),
   ),
   resistor: (
     label: (
-      distance: 2pt
-    )
-  )
+      distance: 2pt,
+    ),
+  ),
 )
 
 #let circuit(init: zap-style, doc) = zap.circuit({
-    import zap: *
-    init-zap
-    zap.set-style(..init)
+  import zap: *
+  init-zap
+  zap.set-style(..init)
 
-    doc
-  })
+  doc
+})
 
 #let circ(n) = {
   if n >= 1 and n <= 9 {
@@ -281,5 +275,5 @@
 
 #let ray(p1, p2, ..style) = {
   cetz.draw.line(p1, p2, ..style, name: "ray")
-  cetz.draw.mark("ray.50%", "ray.end", symbol: "barbed", ..style) 
+  cetz.draw.mark("ray.50%", "ray.end", symbol: "barbed", ..style)
 }

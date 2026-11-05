@@ -1,0 +1,5 @@
+streamlit>=1.40,<2
+
+# Optional: eingebettete PDF-Anzeige direkt in Streamlit.
+# Ohne dieses Extra funktionieren PDF-Erzeugung und Download trotzdem.
+# streamlit[pdf]>=1.40,<2

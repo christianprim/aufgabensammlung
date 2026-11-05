@@ -1,7 +1,7 @@
 #let art = "Prüfung"
 // #let art = "Nachprüfung"
 #let klasse = "Klassenbezeichnung"
-#let datum = "1.1.2000"
+#let datum = "1.1.2020"
 
 #let daten = (art: art, klasse: klasse, datum: datum)
 
@@ -12,9 +12,9 @@
 // ======
 //
 // Einfache Aufgabe mit Zeichnung
-// Eingesetzt: Klasse (Semester), 
+// Eingesetzt: Klasse (HS18),
 #import "vorlage/einfach.typ": aufgabe, lösung; #aufgaben.push([#aufgabe]); #lösungen.push([#lösung])
 //
 // Aufgabe mit Unteraufgaben und Bild
-// Eingesetzt: 
+// Eingesetzt:
 #import "vorlage/unteraufgaben.typ": aufgabe, lösung; #aufgaben.push([#aufgabe]); #lösungen.push([#lösung])
