@@ -2,7 +2,7 @@
 
 Grundgerüst für eine Aufgabensammlung in [typst](https://typst.app)
 
-Tipp: Für eine einfache Bedienung per App nutzt diese Aufgabensammlung git. Daher bietet es sich an, dieses Repository in github zu forken und den Fork auf `privat` zu stellen, damit keine SuS die Aufgabensammlung einsehen können. Dafür ist ein Konto bei github (oder anderem git-Anbieter) nötig. Die mitgelieferte App setzt Schreibrechte auf das Repository voraus.
+Tipp: Für eine einfache Bedienung per App nutzt diese Aufgabensammlung git. Daher bietet es sich an, dieses Repository in github zu forken, den Fork zu `pruefung` umzubenennen und auf `privat` zu stellen, damit keine SuS die Aufgabensammlung einsehen können. Dafür ist ein Konto bei github (oder anderem git-Anbieter) nötig. Die mitgelieferte App setzt Schreibrechte auf das Repository `pruefung` voraus.
 
 # App für die vereinfachte Generierung von Physikprüfungen
 
