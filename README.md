@@ -2,9 +2,26 @@
 
 Grundgerüst für eine Aufgabensammlung in [typst](https://typst.app)
 
-Tipp: Für eine einfache Bedienung per App nutzt diese Aufgabensammlung git. Daher bietet es sich an, dieses Repository in github zu forken, den Fork zu `pruefung` umzubenennen und auf `privat` zu stellen, damit keine SuS die Aufgabensammlung einsehen können. Dafür ist ein Konto bei github (oder anderem git-Anbieter) nötig. Die mitgelieferte App setzt Schreibrechte auf das Repository `pruefung` voraus.
+Tipp: Für eine optionale Bedienung per App nutzt diese Aufgabensammlung git. Daher bietet es sich an, dieses Repository in github zu forken und in den Settings auf `privat` zu stellen, damit keine SuS die Aufgabensammlung einsehen können. Dafür ist ein Konto bei github (oder anderem git-Anbieter) nötig. Für eine sichere Verbindung den eigenen, öffentlichen SSH-Schlüssel in git hinterlegen. Die mitgelieferte App setzt Schreibrechte auf das Repository voraus.
 
-# App für die vereinfachte Generierung von Physikprüfungen
+## Installation (für Linux, sinngemäss für andere OS)
+
+Das geforkte, private Repository mit Schreibrechten nach beispielsweise `~/Dokumente/typst/pruefung` clonen (mit hinterlegtem SSH-Schlüssel) und die Umgebungsvariable `TYPST_ROOT` setzen:
+
+```bash
+mkdir -p ~/Dokumente/typst
+cd ~/Dokumente/typst
+git clone git@github.com:<github-benutzer>/aufgabensammlung.git pruefung
+echo "export TYPST_ROOT=$HOME/Dokumente/typst" >> ~/.bashrc
+source ~/.bashrc
+```
+Falls die App nicht gewünscht wird, können die unbenötigten Dateien gelöscht werden:
+
+```bash
+rm -Rf app.py requirements.txt linux
+```
+
+# App für die vereinfachte Generierung von Physikprüfungen (optional)
 
 Lokale Web-App zum Steuern von `auswahl.typ` in der Typst-Aufgabensammlung.
 Die App liest alle Aufgabenblöcke ein, zeigt sie nach Themen gruppiert an und
@@ -57,10 +74,11 @@ Falls nicht, die angezeigte URL manuell öffnen.
 Für Linux-Systeme liegen im Ordner `linux` zwei Dateien vor, die einen schnelleren 
 Start über die grafische Oberfläche oder die Shell erlauben.
 
-Diese Dateien müssen von Hand in folgende Ordner kopiert werden:
+Diese Dateien ins Benutzerverzeichnis kopieren (und sicherstellen, dass `pruefung` 
+ausführbar ist: `chmod +x ~/.local/bin/pruefung`):
 
-- `~/.local/bin/pruefung`
-- `~/.local/share/applications/physikpruefung.desktop`
+- `linux/pruefung` → `~/.local/bin/pruefung`
+- `linux/physikpruefung.desktop` → `~/.local/share/applications/physikpruefung.desktop`
 
 Im Desktop-/App-Menü heisst der Eintrag **Physikprüfung**. Er startet die App im
 Hintergrund und öffnet den Browser. Über das Kontextmenü des Eintrags lässt
