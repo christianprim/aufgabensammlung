@@ -22,6 +22,7 @@ import shutil
 import signal
 import socket
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -162,10 +163,35 @@ PREVIEW_HOST = "127.0.0.1"
 PREVIEW_PORT = 23625
 PREVIEW_URL = f"http://{PREVIEW_HOST}:{PREVIEW_PORT}"
 
+
+def default_state_dir() -> Path:
+    """Liefert den plattformabhängigen Zustandsordner der App."""
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home()))
+        return base / "pruefung"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Physikpruefung"
+    xdg_state = os.environ.get("XDG_STATE_HOME")
+    if xdg_state:
+        return Path(xdg_state) / "pruefung"
+    return Path.home() / ".local" / "state" / "pruefung"
+
+
+def default_saved_root_file() -> Path:
+    """Liefert den Ablageort für den gespeicherten Standard-Projektordner."""
+    if os.name == "nt":
+        return default_state_dir() / "pruefung-root"
+    if sys.platform == "darwin":
+        return default_state_dir() / "pruefung-root"
+    # Unter Linux bleibt der bisherige Ort erhalten.
+    return Path.home() / ".local" / "state" / "pruefung-root"
+
+
 SAVE_ROOT_KEY = "save_root_checked"
 SAVED_ROOT_FILE = Path(
-    os.environ.get("PRUEFUNG_HOME_FILE", str(Path(os.environ["HOME"]) / ".local/state/pruefung-root"))
+    os.environ.get("PRUEFUNG_HOME_FILE", str(default_saved_root_file()))
 )
+
 
 def load_saved_root() -> str | None:
     """Liest den in der App gespeicherten Standardprojektordner."""
@@ -189,8 +215,7 @@ def save_saved_root(path: str | None) -> bool:
         except OSError:
             pass
         return False
-    directory = Path(os.environ["HOME"]) / ".local" / "state"
-    directory.mkdir(parents=True, exist_ok=True)
+    SAVED_ROOT_FILE.parent.mkdir(parents=True, exist_ok=True)
     try:
         SAVED_ROOT_FILE.write_text(f"{path}\n", encoding="utf-8")
     except OSError:
@@ -1188,28 +1213,47 @@ _PREVIEW_LOG: Path | None = None
 
 
 def stop_preview_process(process: subprocess.Popen[str] | None) -> None:
-    """Beendet einen Tinymist-Prozess samt Prozessgruppe."""
+    """Beendet einen Tinymist-Prozess (unter POSIX samt Prozessgruppe)."""
     if process is None or process.poll() is not None:
         return
 
-    try:
-        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-    except (ProcessLookupError, PermissionError):
+    if os.name == "nt":
         try:
             process.terminate()
-        except ProcessLookupError:
+        except OSError:
             pass
+    else:
+        try:
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+        except OSError:
+            try:
+                process.terminate()
+            except OSError:
+                pass
 
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
-        try:
-            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
+        if os.name == "nt":
             try:
-                process.kill()
-            except ProcessLookupError:
-                pass
+                subprocess.run(
+                    ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                    capture_output=True,
+                    timeout=10,
+                )
+            except (OSError, subprocess.SubprocessError):
+                try:
+                    process.kill()
+                except OSError:
+                    pass
+        else:
+            try:
+                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            except OSError:
+                try:
+                    process.kill()
+                except OSError:
+                    pass
 
 
 def cleanup_preview_at_exit() -> None:
@@ -1270,7 +1314,8 @@ def start_preview(root: Path, typ_filename: str) -> tuple[subprocess.Popen[str],
     if port_in_use(PREVIEW_HOST, PREVIEW_PORT):
         raise PreviewError(
             f"Port {PREVIEW_PORT} ist bereits belegt. Bitte einen alten "
-            "Tinymist-Prozess beenden (z. B. pkill -f 'tinymist preview')."
+            "Tinymist-Prozess beenden (Linux/macOS: "
+            "pkill -f 'tinymist preview'; Windows: Task-Manager)."
         )
 
     log_path = Path(tempfile.gettempdir()) / (
@@ -1282,6 +1327,16 @@ def start_preview(root: Path, typ_filename: str) -> tuple[subprocess.Popen[str],
     except OSError as exc:
         raise PreviewError(f"Logdatei konnte nicht erstellt werden: {exc}") from exc
 
+    popen_kwargs: dict[str, object] = {
+        "cwd": str(root),
+        "stdout": log_handle,
+        "stderr": subprocess.STDOUT,
+        "text": True,
+    }
+    if os.name != "nt":
+        # Eigene Prozessgruppe, damit die Vorschau samt Kindern beendet werden kann.
+        popen_kwargs["start_new_session"] = True
+
     try:
         process = subprocess.Popen(
             [
@@ -1292,11 +1347,7 @@ def start_preview(root: Path, typ_filename: str) -> tuple[subprocess.Popen[str],
                 "--root",
                 str(root),
             ],
-            cwd=str(root),
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-            text=True,
-            start_new_session=True,
+            **popen_kwargs,
         )
     except OSError as exc:
         raise PreviewError(f"tinymist konnte nicht gestartet werden: {exc}") from exc
@@ -1831,11 +1882,8 @@ def render_sidebar() -> None:
 
 def launcher_pid_file() -> Path:
     """Pfad zur PID-Datei, die der Startbefehl ``pruefung`` anlegt."""
-    state_home = Path(
-        os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")
-    )
     state_dir = Path(
-        os.environ.get("PRUEFUNG_STATE_DIR", state_home / "pruefung")
+        os.environ.get("PRUEFUNG_STATE_DIR", str(default_state_dir()))
     )
     return state_dir / "streamlit.pid"
 

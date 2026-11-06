@@ -1,0 +1,270 @@
+#!/usr/bin/env bash
+# Startet die Streamlit-App "Physikprüfung" unter macOS.
+#
+# Verwendung:
+#   ./pruefung              App im Vordergrund starten (Ctrl+C beendet sie)
+#   ./pruefung --background App im Hintergrund starten
+#   ./pruefung --stop       Hintergrund-App beenden
+#   ./pruefung --status     Status anzeigen
+#
+# Anpassbar über Umgebungsvariablen:
+#   PRUEFUNG_DIR         Projektordner (Standard: dieser Ordner)
+#   PRUEFUNG_PORT        Port (Standard: 8501)
+#   PRUEFUNG_NO_BROWSER  1 = Browser nicht automatisch öffnen
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [[ -n "${PRUEFUNG_DIR:-}" ]]; then
+    APP_DIR="${PRUEFUNG_DIR/#\~/$HOME}"
+elif [[ -f "$REPO_ROOT/app.py" ]]; then
+    APP_DIR="$REPO_ROOT"
+elif [[ -n "${TYPST_ROOT:-}" ]]; then
+    APP_DIR="$TYPST_ROOT/pruefung"
+else
+    APP_DIR="$HOME/Dokumente/typst/pruefung"
+fi
+APP_DIR="${APP_DIR/#\~/$HOME}"
+
+HOST="${PRUEFUNG_HOST:-127.0.0.1}"
+PORT="${PRUEFUNG_PORT:-8501}"
+URL="http://${HOST}:${PORT}"
+STATE_DIR="${PRUEFUNG_STATE_DIR:-$HOME/Library/Application Support/Physikpruefung}"
+STATE_DIR="${STATE_DIR/#\~/$HOME}"
+LOG_FILE="$STATE_DIR/streamlit.log"
+PID_FILE="$STATE_DIR/streamlit.pid"
+NO_BROWSER="${PRUEFUNG_NO_BROWSER:-0}"
+SERVER_PID=""
+
+export PRUEFUNG_ROOT="${PRUEFUNG_ROOT:-$APP_DIR}"
+export PRUEFUNG_STATE_DIR="$STATE_DIR"
+
+mkdir -p "$STATE_DIR"
+
+usage() {
+    cat <<EOF
+Verwendung: pruefung [--background|--stop|--status|--help]
+
+  (ohne Option)   App im Vordergrund starten und Browser öffnen
+  --background    App im Hintergrund starten
+  --stop          Hintergrund-App beenden
+  --status        Status anzeigen
+  --help          Diese Hilfe anzeigen
+
+Umgebung:
+  PRUEFUNG_DIR         Projektordner (Standard: dieser Ordner)
+  PRUEFUNG_PORT        Port (Standard: 8501)
+  PRUEFUNG_NO_BROWSER  1 = Browser nicht automatisch öffnen
+  PRUEFUNG_STATE_DIR   Ordner für PID- und Logdateien
+EOF
+}
+
+find_streamlit() {
+    if [[ -x "$APP_DIR/.venv/bin/streamlit" ]]; then
+        printf '%s\n' "$APP_DIR/.venv/bin/streamlit"
+    elif command -v streamlit >/dev/null 2>&1; then
+        command -v streamlit
+    else
+        return 1
+    fi
+}
+
+is_running() {
+    curl -fsS --max-time 1 "$URL/_stcore/health" 2>/dev/null | grep -q '^ok$'
+}
+
+open_browser() {
+    if [[ "$NO_BROWSER" == "1" ]]; then
+        printf 'App läuft unter %s\n' "$URL"
+        return 0
+    fi
+    if command -v open >/dev/null 2>&1; then
+        open "$URL" >/dev/null 2>&1 &
+    else
+        printf 'Bitte im Browser öffnen: %s\n' "$URL"
+    fi
+}
+
+notify_error() {
+    local message="$1"
+    printf 'Fehler: %s\n' "$message" >&2
+    if command -v osascript >/dev/null 2>&1; then
+        osascript -e 'display notification "Siehe Terminal" with title "Physikprüfung"' >/dev/null 2>&1 || true
+    fi
+}
+
+cleanup_foreground() {
+    if [[ -n "${SERVER_PID:-}" ]]; then
+        kill "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
+        SERVER_PID=""
+    fi
+}
+
+trap cleanup_foreground EXIT
+trap 'cleanup_foreground; exit 130' INT TERM HUP
+
+wait_for_server() {
+    local pid="$1"
+    local deadline=$((SECONDS + 30))
+    while (( SECONDS < deadline )); do
+        if ! kill -0 "$pid" 2>/dev/null; then
+            return 1
+        fi
+        if is_running; then
+            return 0
+        fi
+        sleep 0.25
+    done
+    return 1
+}
+
+is_our_process() {
+    local pid="$1"
+    local args
+    args="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+    [[ "$args" == *"streamlit"* && "$args" == *"app.py"* ]]
+}
+
+stop_background() {
+    if [[ ! -f "$PID_FILE" ]]; then
+        if is_running; then
+            printf 'Die App läuft, wurde aber nicht über --background gestartet.\n'
+            printf 'Bitte den Vordergrundprozess mit Ctrl+C beenden.\n'
+            return 1
+        fi
+        printf 'Keine Hintergrund-App gefunden.\n'
+        return 0
+    fi
+
+    local pid
+    pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+    if [[ -z "$pid" ]] || ! kill -0 "$pid" 2>/dev/null; then
+        rm -f "$PID_FILE"
+        printf 'Keine laufende Hintergrund-App gefunden.\n'
+        return 0
+    fi
+    if ! is_our_process "$pid"; then
+        rm -f "$PID_FILE"
+        printf 'Die gespeicherte PID %s gehört nicht mehr zur App; PID-Datei entfernt.\n' "$pid"
+        return 0
+    fi
+
+    kill "$pid" 2>/dev/null || true
+    local deadline=$((SECONDS + 10))
+    while kill -0 "$pid" 2>/dev/null && (( SECONDS < deadline )); do
+        sleep 0.2
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -KILL "$pid" 2>/dev/null || true
+    fi
+    rm -f "$PID_FILE"
+    printf 'Physikprüfung beendet.\n'
+}
+
+show_status() {
+    if is_running; then
+        printf 'Physikprüfung läuft: %s\n' "$URL"
+        if [[ -f "$PID_FILE" ]]; then
+            printf 'PID: %s\n' "$(cat "$PID_FILE" 2>/dev/null || true)"
+        fi
+        printf 'Log: %s\n' "$LOG_FILE"
+    else
+        printf 'Physikprüfung läuft nicht.\n'
+    fi
+}
+
+start_foreground() {
+    if is_running; then
+        open_browser
+        return 0
+    fi
+
+    local streamlit
+    if ! streamlit="$(find_streamlit)"; then
+        notify_error "Streamlit wurde nicht gefunden. Bitte .venv im Projektordner anlegen."
+        return 1
+    fi
+    if [[ ! -f "$APP_DIR/app.py" ]]; then
+        notify_error "app.py wurde nicht gefunden: $APP_DIR/app.py"
+        return 1
+    fi
+
+    cd "$APP_DIR"
+    printf 'Starte Physikprüfung unter %s ...\n' "$URL"
+    "$streamlit" run app.py \
+        --server.address "$HOST" \
+        --server.port "$PORT" \
+        --server.headless true \
+        --browser.gatherUsageStats false &
+    SERVER_PID=$!
+
+    if ! wait_for_server "$SERVER_PID"; then
+        notify_error "Die App konnte nicht gestartet werden. Bitte die Ausgabe im Terminal prüfen."
+        return 1
+    fi
+    open_browser
+    wait "$SERVER_PID"
+}
+
+start_background() {
+    if is_running; then
+        open_browser
+        return 0
+    fi
+
+    local streamlit
+    if ! streamlit="$(find_streamlit)"; then
+        notify_error "Streamlit wurde nicht gefunden. Bitte .venv im Projektordner anlegen."
+        return 1
+    fi
+    if [[ ! -f "$APP_DIR/app.py" ]]; then
+        notify_error "app.py wurde nicht gefunden: $APP_DIR/app.py"
+        return 1
+    fi
+
+    cd "$APP_DIR"
+    printf 'Starte Physikprüfung im Hintergrund unter %s ...\n' "$URL"
+    nohup "$streamlit" run app.py \
+        --server.address "$HOST" \
+        --server.port "$PORT" \
+        --server.headless true \
+        --browser.gatherUsageStats false \
+        >"$LOG_FILE" 2>&1 &
+    local pid=$!
+    printf '%s\n' "$pid" > "$PID_FILE"
+
+    if ! wait_for_server "$pid"; then
+        kill "$pid" 2>/dev/null || true
+        rm -f "$PID_FILE"
+        notify_error "Die App konnte nicht gestartet werden. Siehe $LOG_FILE"
+        return 1
+    fi
+    open_browser
+    printf 'Physikprüfung läuft im Hintergrund (PID %s).\n' "$pid"
+    printf 'Log: %s\n' "$LOG_FILE"
+}
+
+case "${1:-}" in
+    ""|--foreground)
+        start_foreground
+        ;;
+    --background|--desktop)
+        start_background
+        ;;
+    --stop)
+        stop_background
+        ;;
+    --status)
+        show_status
+        ;;
+    --help|-h)
+        usage
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac

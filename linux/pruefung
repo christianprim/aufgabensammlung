@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-APP_DIR="${PRUEFUNG_DIR:-$TYPST_ROOT/pruefung}"
+APP_DIR="${PRUEFUNG_DIR:-${TYPST_ROOT:-$HOME/Dokumente/typst}/pruefung}"
 APP_DIR="${APP_DIR/#\~/$HOME}"
 HOST="${PRUEFUNG_HOST:-127.0.0.1}"
 PORT="${PRUEFUNG_PORT:-8501}"
@@ -24,6 +24,9 @@ LOG_FILE="$STATE_DIR/streamlit.log"
 PID_FILE="$STATE_DIR/streamlit.pid"
 NO_BROWSER="${PRUEFUNG_NO_BROWSER:-0}"
 SERVER_PID=""
+
+export PRUEFUNG_ROOT="${PRUEFUNG_ROOT:-$APP_DIR}"
+export PRUEFUNG_STATE_DIR="$STATE_DIR"
 
 mkdir -p "$STATE_DIR"
 

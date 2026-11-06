@@ -1,0 +1,5 @@
+# Einheitliche Zeilenenden für die Startskripte
+linux/* text eol=lf
+macos/* text eol=lf
+windows/*.cmd text eol=crlf
+windows/*.ps1 text eol=crlf

@@ -2,9 +2,8 @@
 Type=Application
 Name=Physikprüfung
 Comment=Prüfungsaufgaben auswählen, PDFs erzeugen und in Git committen
-TryExec=~/.local/bin/pruefung
-Exec=~/.local/bin/pruefung --background
-Path=$TYPST_ROOT/pruefung
+TryExec=pruefung
+Exec=pruefung --background
 Icon=applications-science
 Terminal=false
 Categories=Education;
@@ -14,4 +13,4 @@ Actions=Stop;
 
 [Desktop Action Stop]
 Name=Hintergrundserver beenden
-Exec=~/.local/bin/pruefung --stop
+Exec=pruefung --stop
